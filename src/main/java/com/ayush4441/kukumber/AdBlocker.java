@@ -135,8 +135,13 @@ public class AdBlocker {
             "})();";
     }
 
-    /** Wraps {@code value} in single quotes, escaping inner single quotes. */
+    /** Wraps {@code value} in single quotes, escaping backslashes, quotes, and control characters. */
     private static String jsString(String value) {
-        return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'";
+        return "'" + value
+                .replace("\\", "\\\\")
+                .replace("'", "\\'")
+                .replace("\r", "\\r")
+                .replace("\n", "\\n")
+                .replace("\t", "\\t") + "'";
     }
 }

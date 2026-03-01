@@ -156,6 +156,16 @@ public class OfflineWebBrowser extends Application {
                 }
             }
 
+            if (newState == Worker.State.SUCCEEDED && loadingFromCache) {
+                // Cache load completed – inject blocker then clear flag
+                adBlocker.injectBlocking(webEngine);
+                loadingFromCache = false;
+            }
+
+            if (newState == Worker.State.FAILED && loadingFromCache) {
+                loadingFromCache = false;
+            }
+
             if (newState == Worker.State.FAILED) {
                 String loc = webEngine.getLocation();
                 if (loc != null && cache.contains(loc)) {
@@ -215,10 +225,9 @@ public class OfflineWebBrowser extends Application {
         String content = cache.load(url);
         if (content != null) {
             loadingFromCache = true;
+            // loadingFromCache will be cleared in the SUCCEEDED/FAILED listener
             webEngine.loadContent(content);
-            loadingFromCache = false;
             statusLabel.setText("Cached: " + shortUrl(url));
-            adBlocker.injectBlocking(webEngine);
         }
     }
 

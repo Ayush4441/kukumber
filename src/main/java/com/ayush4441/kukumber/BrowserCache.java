@@ -61,13 +61,13 @@ public class BrowserCache {
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private Path cachePath(String url) throws NoSuchAlgorithmException {
-        return Path.of(CACHE_DIR, md5(url) + ".html");
+        return Path.of(CACHE_DIR, sha256(url) + ".html");
     }
 
-    private static String md5(String text) throws NoSuchAlgorithmException {
-        MessageDigest md = MessageDigest.getInstance("MD5");
+    private static String sha256(String text) throws NoSuchAlgorithmException {
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
         byte[] hash = md.digest(text.getBytes(StandardCharsets.UTF_8));
-        StringBuilder sb = new StringBuilder(32);
+        StringBuilder sb = new StringBuilder(64);
         for (byte b : hash) {
             sb.append(String.format("%02x", b));
         }
