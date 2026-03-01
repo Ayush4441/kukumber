@@ -1,21 +1,19 @@
 package com.ayush4441.kukumber;
 
-import javafx.scene.web.WebEngine;
+import org.cef.browser.CefBrowser;
 
 import java.util.Set;
 
 /**
- * Ad-blocker that works in two steps once a page has loaded:
+ * Ad-blocker with two layers of protection:
  * <ol>
- *   <li>Injects CSS that hides elements known to carry advertisements.</li>
- *   <li>Executes JavaScript that removes ad-related {@code <iframe>},
- *       {@code <script>} and {@code <img>} elements whose {@code src}
- *       matches a blocked domain, and watches for new ones via
- *       {@code MutationObserver}.</li>
+ *   <li><strong>Network level</strong> – {@link #shouldBlock(String)} lets the
+ *       JCEF {@code CefRequestHandler} cancel requests to known ad/tracking
+ *       domains before any bytes are downloaded.</li>
+ *   <li><strong>DOM level</strong> – {@link #injectBlocking(CefBrowser, String)}
+ *       injects CSS that hides ad containers and JavaScript that removes
+ *       remaining ad elements via a {@code MutationObserver}.</li>
  * </ol>
- *
- * <p>The {@link #shouldBlock(String)} helper can be used by callers who want
- * to decide at the navigation level whether a URL belongs to an ad network.</p>
  */
 public class AdBlocker {
 
@@ -46,7 +44,7 @@ public class AdBlocker {
 
     /**
      * Returns {@code true} when {@code url} belongs to a known ad/tracking
-     * domain.
+     * domain.  Used by the JCEF request handler for network-level blocking.
      */
     public boolean shouldBlock(String url) {
         if (url == null || url.isEmpty()) return false;
@@ -58,22 +56,26 @@ public class AdBlocker {
 
     /**
      * Inject CSS and JavaScript ad-blocking rules into the currently loaded
-     * page.  Safe to call from any thread – the script is executed on the
-     * JavaFX Application Thread via the engine's normal call path.
+     * page.  Safe to call from any thread – JCEF schedules JS execution on
+     * the renderer thread internally.
+     *
+     * @param browser the JCEF browser instance
+     * @param pageUrl URL used as the script source reference in error messages
      */
-    public void injectBlocking(WebEngine engine) {
+    public void injectBlocking(CefBrowser browser, String pageUrl) {
+        if (browser == null) return;
         try {
-            // 1. CSS – hide common ad containers by id/class/attribute
+            // 1. CSS – hide common ad containers by id / class / attribute
             String css = buildBlockingCss();
-            engine.executeScript(
-                    "var __adcss = document.createElement('style');" +
-                    "__adcss.type = 'text/css';" +
-                    "__adcss.textContent = " + jsString(css) + ";" +
-                    "document.head && document.head.appendChild(__adcss);"
-            );
+            browser.executeJavaScript(
+                    "var __adcss=document.createElement('style');" +
+                    "__adcss.type='text/css';" +
+                    "__adcss.textContent=" + jsString(css) + ";" +
+                    "document.head&&document.head.appendChild(__adcss);",
+                    pageUrl, 0);
 
-            // 2. JS – remove ad iframes/scripts with blocked src attributes
-            engine.executeScript(buildBlockingScript());
+            // 2. JS – remove ad elements and watch for dynamically injected ones
+            browser.executeJavaScript(buildBlockingScript(), pageUrl, 0);
         } catch (Exception e) {
             // Page may not have a <head> yet or JS execution is unavailable –
             // silently skip rather than crashing the browser.
